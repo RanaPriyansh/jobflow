@@ -551,7 +551,9 @@ def test_run_locally_routes_custom_handlers(
     supplied = [info_handler, warning_handler, unformatted_handler]
     registered_handlers = tuple(supplied)
 
-    responses = run_locally(emit_records(), store=memory_jobstore, log=supplied)
+    task = emit_records()
+    task.name = "custom-handler-job"
+    responses = run_locally(task, store=memory_jobstore, log=supplied)
     supplied.clear()
     logger.addHandler(info_handler)
     logger.info("after successful run")
@@ -565,11 +567,11 @@ def test_run_locally_routes_custom_handlers(
     assert "INFO-HANDLER INFO Started executing jobs locally" in info_handler.messages
     assert "INFO-HANDLER INFO Finished executing jobs locally" in info_handler.messages
     assert any(
-        item.startswith("Starting job - emit_records (")
+        item.startswith(f"Starting job - {task.name} (")
         for item in unformatted_handler.messages
     )
     assert any(
-        item.startswith("Finished job - emit_records (")
+        item.startswith(f"Finished job - {task.name} (")
         for item in unformatted_handler.messages
     )
     assert "after successful run" in unformatted_handler.messages

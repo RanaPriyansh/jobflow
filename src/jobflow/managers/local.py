@@ -5,12 +5,18 @@ from __future__ import annotations
 import logging
 import typing
 
+from jobflow.utils.log import (
+    _filter_internal_log_records,
+    _jobflow_logs_enabled,
+)
+
 if typing.TYPE_CHECKING:
     from pathlib import Path
 
     import jobflow
 
 logger = logging.getLogger(__name__)
+logger.addFilter(_filter_internal_log_records)
 
 
 def run_locally(
@@ -32,10 +38,14 @@ def run_locally(
         A job or flow.
     log : bool | str | list[logging.Handler]
         Controls logging. Defaults to True. Can be:
-        - False: disable logging
+
+        - False: suppress jobflow log records during this run. Application and
+          dependency logs and print output remain active.
         - True: use default logging format (read from ~/.jobflow.yaml)
         - str: custom format for the generated stdout handler
         - list[logging.Handler]: replace package handlers with the supplied handlers
+
+        Each nested run applies its own log setting, then restores the outer setting.
         Supplied handlers retain their levels and formatters and remain installed after
         this function returns. Logging configuration is process-wide. An empty list
         removes package handlers, but does not disable propagation to root handlers.
@@ -182,11 +192,15 @@ def run_locally(
 
         return not encountered_bad_response
 
-    logger.info("Started executing jobs locally")
-    finished_successfully = _run(flow)
-    logger.info("Finished executing jobs locally")
+    token = _jobflow_logs_enabled.set(log is not False)
+    try:
+        logger.info("Started executing jobs locally")
+        finished_successfully = _run(flow)
+        logger.info("Finished executing jobs locally")
 
-    if ensure_success and not finished_successfully:
-        raise RuntimeError("Flow did not finish running successfully")
+        if ensure_success and not finished_successfully:
+            raise RuntimeError("Flow did not finish running successfully")
 
-    return dict(responses)
+        return dict(responses)
+    finally:
+        _jobflow_logs_enabled.reset(token)

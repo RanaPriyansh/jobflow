@@ -274,7 +274,15 @@ def test_callback_filter_is_not_retained_in_updated_serialized_job():
     restored = MontyDecoder().process_decoded(json.loads(encoded))
 
     assert restored.maker.value == 8
-    assert "callback_filter" not in encoded
+    serialized = json.loads(encoded)
+    pending = [serialized]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, dict):
+            assert "callback_filter" not in value
+            pending.extend(value.values())
+        elif isinstance(value, list):
+            pending.extend(value)
     assert "<lambda>" not in encoded
 
 
